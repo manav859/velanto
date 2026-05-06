@@ -5,20 +5,20 @@ import AnnouncementBar from '@/components/AnnouncementBar'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { getBlogArticles } from '@/lib/shopify'
-import { transformArticle } from '@/lib/transformers'
+import { transformGuideArticle } from '@/lib/transformers'
 
 export const metadata: Metadata = {
   title: 'Car Care Guides',
   description: 'Expert car detailing tips, how-to guides, and product advice for Indian car owners.',
 }
 
+const CATEGORY_TAGS = ['All', 'Exterior', 'Interior', 'Protection', 'Wheels', 'Seasonal']
+
 export default async function GuidesPage() {
-  const { blog, articles: rawArticles } = await getBlogArticles('guides', 24)
-  const articles = rawArticles.map((a) => transformArticle(a, blog?.handle ?? 'guides', blog?.title ?? 'Guides'))
+  const { articles: rawArticles } = await getBlogArticles('guides', 24, 'PUBLISHED_AT', true)
+  const articles = rawArticles.map(transformGuideArticle)
 
   const [featured, ...rest] = articles
-
-  const TAGS = ['All', 'Exterior', 'Interior', 'Protection', 'Wheels', 'Seasonal']
 
   return (
     <>
@@ -29,14 +29,16 @@ export default async function GuidesPage() {
         <section className="bg-background border-b border-white/8 py-16 px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-xs font-bold tracking-widest uppercase text-accent mb-3">Guides & Tips</p>
           <h1 className="text-4xl sm:text-5xl font-black text-white mb-3 tracking-tight">The Velanto Garage</h1>
-          <p className="text-zinc-400 text-sm max-w-md mx-auto">Expert car care tips, how-to guides, and product advice for Indian car owners</p>
+          <p className="text-zinc-400 text-sm max-w-md mx-auto">
+            Expert car care tips, how-to guides, and product advice for Indian car owners
+          </p>
         </section>
 
-        {/* Category tabs */}
+        {/* Category filter tabs (visual — filtering wired if needed) */}
         <div className="border-b border-white/8 bg-surface/50">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-1 overflow-x-auto py-1">
-              {TAGS.map((tag) => (
+              {CATEGORY_TAGS.map((tag) => (
                 <button
                   key={tag}
                   className={`shrink-0 px-4 py-2.5 text-sm font-semibold rounded-md transition-colors ${tag === 'All' ? 'bg-accent text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
@@ -49,19 +51,19 @@ export default async function GuidesPage() {
         </div>
 
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 space-y-16">
-          {/* Featured article */}
+
+          {/* Featured (most recent) article */}
           {featured && (
             <section>
               <Link
                 href={`/guides/${featured.handle}`}
                 className="group grid lg:grid-cols-2 gap-0 rounded-2xl overflow-hidden border border-white/8 hover:border-accent/25 transition-colors"
               >
-                {/* Image */}
                 <div className="relative h-64 lg:h-auto bg-surface-2 overflow-hidden">
                   {featured.image ? (
                     <Image
                       src={featured.image.url}
-                      alt={featured.image.altText}
+                      alt={featured.image.altText ?? featured.title}
                       fill
                       sizes="(max-width: 1024px) 100vw, 50vw"
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -73,21 +75,24 @@ export default async function GuidesPage() {
                       </svg>
                     </div>
                   )}
-                  <span className="absolute top-4 left-4 bg-accent text-white text-xs font-bold px-3 py-1 rounded-full">Featured</span>
+                  <span className="absolute top-4 left-4 bg-accent text-white text-xs font-bold px-3 py-1 rounded-full">
+                    Latest
+                  </span>
                 </div>
-                {/* Content */}
+
                 <div className="bg-surface p-8 lg:p-10 flex flex-col justify-center gap-4">
-                  <p className="text-xs font-bold tracking-widest uppercase text-accent">{featured.tags[0] ?? 'Guide'}</p>
-                  <h2 className="text-2xl sm:text-3xl font-black text-white leading-snug group-hover:text-accent-bright transition-colors">{featured.title}</h2>
+                  {featured.category && (
+                    <p className="text-xs font-bold tracking-widest uppercase text-accent">{featured.category}</p>
+                  )}
+                  <h2 className="text-2xl sm:text-3xl font-black text-white leading-snug group-hover:text-accent-bright transition-colors">
+                    {featured.title}
+                  </h2>
                   {featured.excerpt && (
                     <p className="text-zinc-400 text-sm leading-relaxed line-clamp-3">{featured.excerpt}</p>
                   )}
                   <div className="flex items-center gap-3 text-xs text-zinc-500 mt-2">
-                    <span>{featured.author}</span>
-                    <span>•</span>
-                    <span>{featured.publishedAt}</span>
-                    <span>•</span>
-                    <span>{featured.readTime} min read</span>
+                    {featured.publishedAt && <span>{featured.publishedAt}</span>}
+                    {featured.readTime && <><span>•</span><span>{featured.readTime} read</span></>}
                   </div>
                   <span className="inline-flex items-center gap-2 text-accent text-sm font-semibold mt-2">
                     Read Article
@@ -100,12 +105,10 @@ export default async function GuidesPage() {
             </section>
           )}
 
-          {/* All articles grid */}
+          {/* Rest of articles */}
           {rest.length > 0 && (
             <section>
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-xl font-black text-white">Latest Articles</h2>
-              </div>
+              <h2 className="text-xl font-black text-white mb-8">All Articles</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {rest.map((article) => (
                   <Link
@@ -117,7 +120,7 @@ export default async function GuidesPage() {
                       {article.image ? (
                         <Image
                           src={article.image.url}
-                          alt={article.image.altText}
+                          alt={article.image.altText ?? article.title}
                           fill
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                           className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -129,19 +132,28 @@ export default async function GuidesPage() {
                           </svg>
                         </div>
                       )}
-                      {article.tags[0] && (
+                      {article.category && (
                         <span className="absolute top-3 left-3 bg-accent/90 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide">
-                          {article.tags[0]}
+                          {article.category}
                         </span>
                       )}
                     </div>
+
                     <div className="flex flex-col flex-1 p-5 gap-3">
-                      <h3 className="text-sm font-bold text-white leading-snug group-hover:text-accent-bright transition-colors line-clamp-2">{article.title}</h3>
+                      <h3 className="text-sm font-bold text-white leading-snug group-hover:text-accent-bright transition-colors line-clamp-2">
+                        {article.title}
+                      </h3>
                       {article.excerpt && (
-                        <p className="text-xs text-zinc-500 leading-relaxed line-clamp-2 flex-1">{article.excerpt}</p>
+                        <p className="text-xs text-zinc-500 leading-relaxed line-clamp-2 flex-1">
+                          {article.excerpt}
+                        </p>
                       )}
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-zinc-600">{article.publishedAt} · {article.readTime} min</span>
+                        <span className="text-xs text-zinc-600">
+                          {[article.publishedAt, article.readTime && `${article.readTime} read`]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
                         <span className="text-xs font-semibold text-accent flex items-center gap-1">
                           Read
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -160,7 +172,9 @@ export default async function GuidesPage() {
           {articles.length === 0 && (
             <div className="py-24 text-center">
               <p className="text-zinc-400 text-lg font-semibold mb-2">No guides yet</p>
-              <p className="text-zinc-600 text-sm">Check back soon — we&apos;re writing expert detailing guides for you.</p>
+              <p className="text-zinc-600 text-sm">
+                Check back soon — we&apos;re writing expert detailing guides for you.
+              </p>
             </div>
           )}
         </div>

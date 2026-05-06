@@ -6,7 +6,7 @@ import AnnouncementBar from '@/components/AnnouncementBar'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import ProductCard from '@/components/ProductCard'
-import { getCollectionByHandle, getCollections } from '@/lib/shopify'
+import { getCollectionByHandle } from '@/lib/shopify'
 import { transformCollection } from '@/lib/transformers'
 
 type Props = { params: Promise<{ handle: string }> }
@@ -21,10 +21,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export async function generateStaticParams() {
-  const collections = await getCollections(20)
-  return collections.map((c) => ({ handle: c.handle }))
-}
 
 export default async function CollectionPage({ params }: Props) {
   const { handle } = await params

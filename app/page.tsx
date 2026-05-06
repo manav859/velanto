@@ -9,7 +9,15 @@ import WhyChooseUs from '@/components/WhyChooseUs'
 import GuidesSection from '@/components/GuidesSection'
 import Footer from '@/components/Footer'
 import ProductGridSkeleton from '@/components/ProductGridSkeleton'
-import { getHomepageHero } from '@/lib/shopify'
+import {
+  getHomepageHero,
+  getHomepageFeaturedProducts,
+  getHomepageGuides,
+} from '@/lib/shopify'
+import {
+  transformHomepageFeaturedProducts,
+  transformGuideArticle,
+} from '@/lib/transformers'
 
 export const metadata = {
   title: 'Velanto — Premium Car Detailing Products',
@@ -18,7 +26,15 @@ export const metadata = {
 }
 
 export default async function HomePage() {
-  const hero = await getHomepageHero()
+  // All three fetches run in parallel — zero waterfall
+  const [hero, rawFeatured, rawGuides] = await Promise.all([
+    getHomepageHero(),
+    getHomepageFeaturedProducts(),
+    getHomepageGuides(),
+  ])
+
+  const featuredCms = rawFeatured ? transformHomepageFeaturedProducts(rawFeatured) : null
+  const guides = rawGuides.map(transformGuideArticle)
 
   return (
     <>
@@ -28,11 +44,12 @@ export default async function HomePage() {
         <HeroSection hero={hero} />
         <CategoryTiles />
         <Suspense fallback={<FeaturedProductsSkeleton />}>
-          <FeaturedProducts />
+          <FeaturedProducts cms={featuredCms} />
         </Suspense>
         <StarterGuideSection />
         <WhyChooseUs />
-        <GuidesSection />
+        {/* guides: empty array → GuidesSection renders static fallback cards */}
+        <GuidesSection guides={guides} />
       </main>
       <Footer />
     </>

@@ -1,17 +1,49 @@
 import { GraphQLClient, gql } from 'graphql-request'
 import { cacheLife, cacheTag } from 'next/cache'
 
-const domain = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN!
-const token = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN!
+const domain = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN
+const token = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN
+
+// ── Startup validation ────────────────────────────────────────────────────────
+// Fail loudly in development so missing env vars are obvious immediately.
+if (!domain || !token) {
+  const missing = [
+    !domain && 'NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN',
+    !token && 'NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN',
+  ].filter(Boolean).join(', ')
+  if (process.env.NODE_ENV === 'development') {
+    console.error(
+      `\n[Velanto] ❌ Missing required environment variables: ${missing}\n` +
+      `Add them to .env.local:\n` +
+      `  NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN=your-store.myshopify.com\n` +
+      `  NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN=your-storefront-token\n`
+    )
+  }
+}
+
 const API_VERSION = '2025-01'
-const endpoint = `https://${domain}/api/${API_VERSION}/graphql.json`
+const endpoint = `https://${domain ?? ''}/api/${API_VERSION}/graphql.json`
 
 const shopifyClient = new GraphQLClient(endpoint, {
   headers: {
-    'X-Shopify-Storefront-Access-Token': token,
+    'X-Shopify-Storefront-Access-Token': token ?? '',
     'Content-Type': 'application/json',
   },
 })
+
+// ── Error classifier ──────────────────────────────────────────────────────────
+// Shopify returns UNAUTHORIZED (401) for bad/missing tokens and
+// ACCESS_DENIED for valid tokens that lack a specific scope.
+function classifyShopifyError(err: unknown): 'UNAUTHORIZED' | 'ACCESS_DENIED' | 'OTHER' {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (msg.includes('"status":401') || msg.includes('Code: 401') || msg.includes('UNAUTHORIZED')) {
+    return 'UNAUTHORIZED'
+  }
+  if (msg.includes('ACCESS_DENIED') || msg.includes('access_denied')) {
+    return 'ACCESS_DENIED'
+  }
+  return 'OTHER'
+}
 
 // ─── Shared types ─────────────────────────────────────────────────────────────
 
@@ -74,9 +106,10 @@ export type ShopifyArticle = {
   content?: string
   contentHtml?: string
   publishedAt: string
-  image?: { url: string; altText: string | null } | null
+  image?: { url: string; altText: string | null; width?: number | null; height?: number | null } | null
   author?: { name: string }
   tags?: string[]
+  seo?: { title?: string | null; description?: string | null }
 }
 
 export type CartLine = {
@@ -108,10 +141,30 @@ export type ShopifyCart = {
 
 export type HeroImage = { url: string; altText: string | null; width: number | null; height: number | null }
 type ShopifyMediaImageReference = { image: HeroImage }
+
+// ShopifyMetaobjectField supports both single reference (image) and list references (products)
 export type ShopifyMetaobjectField = {
   key: string
   value: string | null
   reference: ShopifyMediaImageReference | null
+  // For list-of-product-reference fields (homepage_featured_products → products)
+  references: { edges: { node: ShopifyProduct | null }[] } | null
+}
+
+// ─── Homepage Featured Products metaobject ────────────────────────────────────
+
+export type HomepageFeaturedProductsRaw = {
+  id: string
+  type: string
+  fields: ShopifyMetaobjectField[]
+}
+
+export type HomepageFeaturedProducts = {
+  eyebrow: string
+  heading: string
+  linkLabel: string
+  linkUrl: string
+  products: ShopifyProduct[]
 }
 
 export type HomepageHero = {
@@ -199,6 +252,40 @@ const COLLECTIONS_QUERY = gql`
   }
 `
 
+// ─── Featured Products: lightweight product fields for metaobject references ───
+const PRODUCT_REF_FIELDS = gql`
+  fragment ProductRefFields on Product {
+    id title handle description availableForSale
+    featuredImage { url altText }
+    priceRange { minVariantPrice { amount currencyCode } }
+    compareAtPriceRange { minVariantPrice { amount currencyCode } }
+  }
+`
+
+const HOMEPAGE_FEATURED_PRODUCTS_QUERY = gql`
+  query GetHomepageFeaturedProducts {
+    metaobject(handle: {
+      type: "homepage_featured_products",
+      handle: "homepage-featured-products"
+    }) {
+      id
+      type
+      fields {
+        key
+        value
+        references(first: 10) {
+          edges {
+            node {
+              ... on Product { ...ProductRefFields }
+            }
+          }
+        }
+      }
+    }
+  }
+  ${PRODUCT_REF_FIELDS}
+`
+
 const HOMEPAGE_HERO_QUERY = gql`
   query GetHomepageHero {
     metaobject(handle: { type: "homepage_hero", handle: "professional-grade" }) {
@@ -215,17 +302,22 @@ const HOMEPAGE_HERO_QUERY = gql`
   }
 `
 
+// sortKey values: PUBLISHED_AT | TITLE | AUTHOR | UPDATED_AT | ID | RELEVANCE (default: ID)
 const BLOG_ARTICLES_QUERY = gql`
-  query GetBlogArticles($blogHandle: String!, $first: Int!) {
+  query GetBlogArticles(
+    $blogHandle: String!
+    $first: Int!
+    $sortKey: ArticleSortKeys
+    $reverse: Boolean
+  ) {
     blog(handle: $blogHandle) {
       id title handle
-      articles(first: $first) {
+      articles(first: $first, sortKey: $sortKey, reverse: $reverse) {
         edges {
           node {
-            id title handle excerpt contentHtml publishedAt
-            image { url altText }
+            id title handle excerpt contentHtml publishedAt tags
+            image { url altText width height }
             author { name }
-            tags
           }
         }
       }
@@ -238,10 +330,10 @@ const ARTICLE_BY_HANDLE_QUERY = gql`
     blog(handle: $blogHandle) {
       id title handle
       articleByHandle(handle: $articleHandle) {
-        id title handle excerpt contentHtml publishedAt
-        image { url altText }
+        id title handle excerpt contentHtml publishedAt tags
+        image { url altText width height }
         author { name }
-        tags
+        seo { title description }
       }
     }
   }
@@ -363,10 +455,20 @@ export async function getProducts(first = 12): Promise<ShopifyProduct[]> {
   'use cache'
   cacheLife('minutes')
   cacheTag('products')
-  const data = await shopifyClient.request<{
-    products: { edges: { node: ShopifyProduct }[] }
-  }>(PRODUCTS_QUERY, { first })
-  return data.products.edges.map((e) => e.node)
+  try {
+    const data = await shopifyClient.request<{
+      products: { edges: { node: ShopifyProduct }[] }
+    }>(PRODUCTS_QUERY, { first })
+    return data.products.edges.map((e) => e.node)
+  } catch (err) {
+    const kind = classifyShopifyError(err)
+    if (kind === 'UNAUTHORIZED') {
+      console.error('[getProducts] 401 UNAUTHORIZED — check NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN')
+    } else {
+      console.error('[getProducts]', err instanceof Error ? err.message : err)
+    }
+    return []
+  }
 }
 
 export async function getProductByHandle(
@@ -375,11 +477,16 @@ export async function getProductByHandle(
   'use cache'
   cacheLife('minutes')
   cacheTag(`product-${handle}`)
-  const data = await shopifyClient.request<{ product: ShopifyProduct | null }>(
-    PRODUCT_BY_HANDLE_QUERY,
-    { handle }
-  )
-  return data.product
+  try {
+    const data = await shopifyClient.request<{ product: ShopifyProduct | null }>(
+      PRODUCT_BY_HANDLE_QUERY,
+      { handle }
+    )
+    return data.product
+  } catch (err) {
+    console.error('[getProductByHandle]', err instanceof Error ? err.message : err)
+    return null
+  }
 }
 
 export async function getCollectionByHandle(
@@ -389,20 +496,35 @@ export async function getCollectionByHandle(
   'use cache'
   cacheLife('minutes')
   cacheTag(`collection-${handle}`)
-  const data = await shopifyClient.request<{
-    collection: ShopifyCollection | null
-  }>(COLLECTION_BY_HANDLE_QUERY, { handle, first })
-  return data.collection
+  try {
+    const data = await shopifyClient.request<{
+      collection: ShopifyCollection | null
+    }>(COLLECTION_BY_HANDLE_QUERY, { handle, first })
+    return data.collection
+  } catch (err) {
+    console.error('[getCollectionByHandle]', err instanceof Error ? err.message : err)
+    return null
+  }
 }
 
 export async function getCollections(first = 12): Promise<ShopifyCollection[]> {
   'use cache'
   cacheLife('hours')
   cacheTag('collections')
-  const data = await shopifyClient.request<{
-    collections: { edges: { node: ShopifyCollection }[] }
-  }>(COLLECTIONS_QUERY, { first })
-  return data.collections.edges.map((e) => e.node)
+  try {
+    const data = await shopifyClient.request<{
+      collections: { edges: { node: ShopifyCollection }[] }
+    }>(COLLECTIONS_QUERY, { first })
+    return data.collections.edges.map((e) => e.node)
+  } catch (err) {
+    const kind = classifyShopifyError(err)
+    if (kind === 'UNAUTHORIZED') {
+      console.error('[getCollections] 401 UNAUTHORIZED — check NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN')
+    } else {
+      console.error('[getCollections]', err instanceof Error ? err.message : err)
+    }
+    return []
+  }
 }
 
 export async function getHomepageHero(): Promise<HomepageHero | null> {
@@ -418,11 +540,13 @@ export async function getHomepageHero(): Promise<HomepageHero | null> {
   try {
     data = await shopifyClient.request<MetaobjectQueryResult>(HOMEPAGE_HERO_QUERY)
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    if (message.includes('ACCESS_DENIED') || message.includes('unauthenticated_read_metaobjects')) {
-      console.error('[getHomepageHero] ACCESS_DENIED — enable unauthenticated_read_metaobjects scope')
+    const kind = classifyShopifyError(err)
+    if (kind === 'UNAUTHORIZED') {
+      console.error('[getHomepageHero] 401 UNAUTHORIZED — check NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN in .env.local')
+    } else if (kind === 'ACCESS_DENIED') {
+      console.warn('[getHomepageHero] ACCESS_DENIED: enable scope "unauthenticated_read_metaobjects" — hero using fallback text')
     } else {
-      console.error('[getHomepageHero] unexpected API error:', message)
+      console.error('[getHomepageHero]', err instanceof Error ? err.message : err)
     }
     return null
   }
@@ -431,9 +555,54 @@ export async function getHomepageHero(): Promise<HomepageHero | null> {
   return transformHeroFields(data.metaobject.fields)
 }
 
+export async function getHomepageFeaturedProducts(): Promise<HomepageFeaturedProducts | null> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag('homepage-featured-products')
+
+  type Result = {
+    metaobject: HomepageFeaturedProductsRaw | null
+  }
+
+  try {
+    const data = await shopifyClient.request<Result>(HOMEPAGE_FEATURED_PRODUCTS_QUERY)
+    if (!data.metaobject) return null
+
+    const fields = data.metaobject.fields
+    const text = (key: string, fallback = '') =>
+      fields.find((f) => f.key === key)?.value ?? fallback
+
+    // Extract products from the `references` of the `products` field
+    const productsField = fields.find((f) => f.key === 'products')
+    const products: ShopifyProduct[] = (productsField?.references?.edges ?? [])
+      .map((e) => e.node)
+      .filter((n): n is ShopifyProduct => n !== null)
+
+    return {
+      eyebrow: text('section_eyebrow', 'Hand-Picked'),
+      heading: text('section_heading', 'Featured Products'),
+      linkLabel: text('section_link_label', 'View all'),
+      linkUrl: text('section_link_url', '/shop'),
+      products,
+    }
+  } catch (err) {
+    const kind = classifyShopifyError(err)
+    if (kind === 'UNAUTHORIZED') {
+      console.error('[getHomepageFeaturedProducts] 401 UNAUTHORIZED — check NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN')
+    } else if (kind === 'ACCESS_DENIED') {
+      console.warn('[getHomepageFeaturedProducts] ACCESS_DENIED: enable scope "unauthenticated_read_metaobjects" — falling back to getProducts()')
+    } else {
+      console.error('[getHomepageFeaturedProducts]', err instanceof Error ? err.message : err)
+    }
+    return null
+  }
+}
+
 export async function getBlogArticles(
   blogHandle = 'guides',
-  first = 12
+  first = 12,
+  sortKey: 'PUBLISHED_AT' | 'TITLE' | 'AUTHOR' | 'UPDATED_AT' | 'ID' = 'PUBLISHED_AT',
+  reverse = true
 ): Promise<{ blog: { id: string; title: string; handle: string } | null; articles: ShopifyArticle[] }> {
   'use cache'
   cacheLife('minutes')
@@ -452,12 +621,29 @@ export async function getBlogArticles(
     const data = await shopifyClient.request<BlogResult>(BLOG_ARTICLES_QUERY, {
       blogHandle,
       first,
+      sortKey,
+      reverse,
     })
     return {
       blog: data.blog ? { id: data.blog.id, title: data.blog.title, handle: data.blog.handle } : null,
       articles: data.blog?.articles.edges.map((e) => e.node) ?? [],
     }
-  } catch {
+  } catch (err) {
+    const kind = classifyShopifyError(err)
+    if (kind === 'UNAUTHORIZED') {
+      // Hard error — token is wrong/missing, needs .env.local fix
+      console.error('[getBlogArticles] 401 UNAUTHORIZED — check NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN in .env.local')
+    } else if (kind === 'ACCESS_DENIED') {
+      // Config warning — scope not yet enabled, guides section falls back to static cards
+      console.warn(
+        '[getBlogArticles] ACCESS_DENIED: unauthenticated_read_content scope is missing.\n' +
+        '  → Shopify Admin → Settings → Apps → Develop apps → [app] → Configuration\n' +
+        '  → Storefront API access scopes → enable "unauthenticated_read_content" → Save → Install app\n' +
+        '  → Guides section is showing static fallback cards until this is fixed.'
+      )
+    } else {
+      console.error('[getBlogArticles]', err instanceof Error ? err.message : err)
+    }
     return { blog: null, articles: [] }
   }
 }
@@ -483,6 +669,26 @@ export async function getArticleByHandle(
   } catch {
     return null
   }
+}
+
+/**
+ * Fetch the 3 most-recent articles from the "guides" blog for the homepage.
+ * Sorted by PUBLISHED_AT descending — newest first.
+ */
+export async function getHomepageGuides(): Promise<ShopifyArticle[]> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag('homepage-guides')
+  const { articles } = await getBlogArticles('guides', 3, 'PUBLISHED_AT', true)
+  return articles
+}
+
+/**
+ * Fetch a single guide article from the "guides" blog by handle.
+ * This is the canonical function for guide detail pages.
+ */
+export async function getGuideByHandle(handle: string): Promise<ShopifyArticle | null> {
+  return getArticleByHandle('guides', handle)
 }
 
 // ─── Client-side cart operations (called from CartContext) ────────────────────

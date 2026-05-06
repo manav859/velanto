@@ -4,6 +4,7 @@ import type {
   ShopifyCollection,
   ShopifyArticle,
   ShopifyCart,
+  HomepageFeaturedProducts,
 } from './shopify'
 
 // ─── Price formatter ──────────────────────────────────────────────────────────
@@ -175,6 +176,115 @@ export function transformArticle(
     author: article.author?.name ?? 'Velanto Team',
     tags: article.tags ?? [],
     blog: { handle: blogHandle, title: blogTitle },
+  }
+}
+
+// ─── Guide transformers ───────────────────────────────────────────────────────
+//
+// Leaner, purpose-built types for the Guides blog section.
+// GuideCardData → used by GuidesSection, /guides listing page cards
+// GuideDetailData → used by /guides/[handle] detail page
+
+export type GuideCardData = {
+  id: string
+  title: string
+  handle: string
+  excerpt: string
+  /** First Shopify tag used as display category */
+  category?: string
+  /** Estimated read time as formatted string, e.g. "5 min" */
+  readTime?: string
+  publishedAt?: string
+  image?: {
+    url: string
+    altText?: string | null
+    width?: number | null
+    height?: number | null
+  }
+}
+
+export type GuideDetailData = GuideCardData & {
+  contentHtml: string
+  seoTitle?: string | null
+  seoDescription?: string | null
+  author: string
+  tags: string[]
+}
+
+function estimateReadTime(html: string | undefined | null): string {
+  if (!html) return '3 min'
+  // Strip HTML tags, split on whitespace, count words
+  const words = html.replace(/<[^>]*>/g, ' ').split(/\s+/).filter(Boolean).length
+  return `${Math.max(1, Math.round(words / 200))} min`
+}
+
+function formatPublishedAt(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+  } catch {
+    return iso
+  }
+}
+
+export function transformGuideArticle(article: ShopifyArticle): GuideCardData {
+  return {
+    id: article.id,
+    title: article.title,
+    handle: article.handle,
+    excerpt: article.excerpt ?? '',
+    category: article.tags?.[0],
+    readTime: estimateReadTime(article.contentHtml),
+    publishedAt: formatPublishedAt(article.publishedAt),
+    image: article.image
+      ? {
+          url: article.image.url,
+          altText: article.image.altText,
+          width: article.image.width ?? null,
+          height: article.image.height ?? null,
+        }
+      : undefined,
+  }
+}
+
+export function transformGuideDetail(article: ShopifyArticle): GuideDetailData {
+  return {
+    ...transformGuideArticle(article),
+    contentHtml: article.contentHtml ?? '',
+    seoTitle: article.seo?.title ?? null,
+    seoDescription: article.seo?.description ?? null,
+    author: article.author?.name ?? 'Velanto Team',
+    tags: article.tags ?? [],
+  }
+}
+
+// ─── Homepage Featured Products transformer ───────────────────────────────────
+
+export type TransformedFeaturedProductsSection = {
+  eyebrow: string
+  heading: string
+  linkLabel: string
+  linkUrl: string
+  products: TransformedProduct[]
+}
+
+/**
+ * Transforms the raw HomepageFeaturedProducts metaobject into a
+ * frontend-ready shape. Returns null when the metaobject doesn't
+ * exist yet in Shopify — callers should fall back gracefully.
+ */
+export function transformHomepageFeaturedProducts(
+  raw: HomepageFeaturedProducts
+): TransformedFeaturedProductsSection {
+  return {
+    eyebrow: raw.eyebrow,
+    heading: raw.heading,
+    linkLabel: raw.linkLabel,
+    linkUrl: raw.linkUrl,
+    products: raw.products.map(transformProduct),
   }
 }
 
