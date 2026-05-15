@@ -28,25 +28,31 @@ export type TransformedProduct = {
   id: string
   title: string
   handle: string
+  createdAt: string
   description: string
   descriptionHtml: string
   vendor: string
   productType: string
   tags: string[]
   price: string
+  priceAmount: number
   compareAtPrice: string | null
+  compareAtPriceAmount: number | null
   onSale: boolean
   featuredImage: { url: string; altText: string } | null
   images: { url: string; altText: string }[]
   variants: TransformedVariant[]
   availableForSale: boolean
+  collectionHandles: string[]
 }
 
 export type TransformedVariant = {
   id: string
   title: string
   price: string
+  priceAmount: number
   compareAtPrice: string | null
+  compareAtPriceAmount: number | null
   availableForSale: boolean
   selectedOptions: { name: string; value: string }[]
 }
@@ -54,23 +60,31 @@ export type TransformedVariant = {
 export function transformProduct(product: ShopifyProduct): TransformedProduct {
   const { amount, currencyCode } = product.priceRange.minVariantPrice
   const compareAt = product.compareAtPriceRange?.minVariantPrice
+  const priceAmount = parseFloat(amount)
+  const compareAtPriceAmount = compareAt ? parseFloat(compareAt.amount) : null
 
   return {
     id: product.id,
     title: product.title,
     handle: product.handle,
+    createdAt: product.createdAt ?? '',
     description: product.description,
     descriptionHtml: product.descriptionHtml ?? '',
     vendor: product.vendor ?? '',
     productType: product.productType ?? '',
     tags: product.tags ?? [],
     price: formatPrice(amount, currencyCode),
+    priceAmount,
     compareAtPrice:
-      compareAt && parseFloat(compareAt.amount) > parseFloat(amount)
+      compareAt && compareAtPriceAmount !== null && compareAtPriceAmount > priceAmount
         ? formatPrice(compareAt.amount, compareAt.currencyCode)
         : null,
+    compareAtPriceAmount:
+      compareAt && compareAtPriceAmount !== null && compareAtPriceAmount > priceAmount
+        ? compareAtPriceAmount
+        : null,
     onSale:
-      !!compareAt && parseFloat(compareAt.amount) > parseFloat(amount),
+      !!compareAt && compareAtPriceAmount !== null && compareAtPriceAmount > priceAmount,
     featuredImage: product.featuredImage
       ? {
           url: product.featuredImage.url,
@@ -85,16 +99,21 @@ export function transformProduct(product: ShopifyProduct): TransformedProduct {
       id: e.node.id,
       title: e.node.title,
       price: formatPrice(e.node.price.amount, e.node.price.currencyCode),
+      priceAmount: parseFloat(e.node.price.amount),
       compareAtPrice: e.node.compareAtPrice
         ? formatPrice(
             e.node.compareAtPrice.amount,
             e.node.compareAtPrice.currencyCode
           )
         : null,
+      compareAtPriceAmount: e.node.compareAtPrice
+        ? parseFloat(e.node.compareAtPrice.amount)
+        : null,
       availableForSale: e.node.availableForSale,
       selectedOptions: e.node.selectedOptions,
     })),
     availableForSale: product.availableForSale ?? true,
+    collectionHandles: (product.collections?.edges ?? []).map((edge) => edge.node.handle),
   }
 }
 

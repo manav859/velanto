@@ -3,42 +3,42 @@
 import { motion } from 'framer-motion'
 
 const FEATURES = [
-  { icon: '🇮🇳', title: 'Made for India', body: 'Every formula tested on Indian roads — designed for our dust, humidity, and hard water conditions.' },
-  { icon: '🧪', title: 'Pro-Grade Formula', body: 'pH-balanced, non-abrasive formulas that protect your clear coat while delivering a deep clean.' },
-  { icon: '🚚', title: 'Fast Shipping', body: 'Orders dispatched same day. Free shipping above ₹999. Pan-India delivery in 3–5 days.' },
-  { icon: '🎓', title: 'Beginner Friendly', body: 'Starter kits and step-by-step guides make professional detailing accessible to everyone.' },
+  { title: 'Made for India', body: 'Every formula is positioned for Indian roads, dust levels, humidity, and hard water conditions.' },
+  { title: 'Pro-Grade Formula', body: 'pH-balanced, non-abrasive formulas designed to clean effectively while respecting modern paint and trim.' },
+  { title: 'Secure Checkout', body: 'Checkout is handled on Shopify so customers complete payment on a trusted hosted flow.' },
+  { title: 'Beginner Friendly', body: 'Starter kits and straightforward product pages make it easier to build a safe detailing routine.' },
 ]
 
 export default function WhyChooseUs() {
   return (
-    <section className="py-20 bg-background">
+    <section className="bg-background py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-14"
+          className="mb-14 text-center"
         >
-          <p className="text-xs font-semibold tracking-widest uppercase text-accent mb-2">Why Velanto</p>
-          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Built Different. By Detailers.</h2>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-accent">Why Velanto</p>
+          <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Built Different. By Detailers.</h2>
         </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {FEATURES.map((feat, i) => (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {FEATURES.map((feature, index) => (
             <motion.div
-              key={feat.title}
+              key={feature.title}
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
-              transition={{ duration: 0.45, delay: i * 0.08 }}
-              className="group rounded-xl border border-white/8 bg-surface p-6 hover:border-accent/25 hover:bg-surface-2 transition-all duration-300"
+              transition={{ duration: 0.45, delay: index * 0.08 }}
+              className="group rounded-xl border border-white/8 bg-surface p-6 transition-all duration-300 hover:border-accent/25 hover:bg-surface-2"
             >
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-accent/10 text-2xl mb-5 group-hover:bg-accent/20 transition-colors duration-300">
-                {feat.icon}
+              <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 text-sm font-bold text-accent transition-colors duration-300 group-hover:bg-accent/20">
+                0{index + 1}
               </div>
-              <h3 className="text-base font-bold text-white mb-2">{feat.title}</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">{feat.body}</p>
+              <h3 className="mb-2 text-base font-bold text-white">{feature.title}</h3>
+              <p className="text-sm leading-relaxed text-zinc-500">{feature.body}</p>
             </motion.div>
           ))}
         </div>

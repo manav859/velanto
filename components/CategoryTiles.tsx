@@ -7,7 +7,7 @@ const CATEGORIES = [
   { title: 'Exterior Wash', description: 'Shampoos, foam cannons & wash mitts', href: '/collections/exterior-care', color: 'group-hover:bg-blue-500/10 group-hover:border-blue-500/30', icon: '🫧' },
   { title: 'Interior Care', description: 'Cleaners, dressings & odour eliminators', href: '/collections/interior-care', color: 'group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30', icon: '🪑' },
   { title: 'Wheel & Tyre', description: 'Rim cleaners, tyre dressings & brushes', href: '/collections/wheel-tyre', color: 'group-hover:bg-orange-500/10 group-hover:border-orange-500/30', icon: '⚙️' },
-  { title: 'Ceramic Protection', description: 'Ceramic sprays, coatings & sealants', href: '/collections/ceramic', color: 'group-hover:bg-violet-500/10 group-hover:border-violet-500/30', icon: '💎' },
+  { title: 'Ceramic Protection', description: 'Ceramic sprays, coatings & sealants', href: '/collections/ceramic-protection', color: 'group-hover:bg-violet-500/10 group-hover:border-violet-500/30', icon: '💎' },
   { title: 'Microfibre', description: 'Towels, applicators & detailing tools', href: '/collections/microfibre', color: 'group-hover:bg-pink-500/10 group-hover:border-pink-500/30', icon: '🧹' },
   { title: 'Kits & Bundles', description: 'Curated sets for complete detailing', href: '/collections/kits-bundles', color: 'group-hover:bg-accent/10 group-hover:border-accent/30', icon: '📦' },
 ]

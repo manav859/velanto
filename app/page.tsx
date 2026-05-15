@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
 import AnnouncementBar from '@/components/AnnouncementBar'
 import Header from '@/components/Header'
 import HeroSection from '@/components/HeroSection'
@@ -19,10 +20,15 @@ import {
   transformGuideArticle,
 } from '@/lib/transformers'
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Velanto — Premium Car Detailing Products',
   description:
     'Professional-grade car care products for a showroom finish. Shop shampoos, ceramic sprays, tyre cleaners, microfibre towels and detailing kits.',
+  openGraph: {
+    title: 'Velanto — Premium Car Detailing Products',
+    description: 'Professional-grade car care products engineered for Indian roads. Showroom finish, every time.',
+    type: 'website',
+  },
 }
 
 export default async function HomePage() {
@@ -40,7 +46,7 @@ export default async function HomePage() {
     <>
       <AnnouncementBar />
       <Header />
-      <main>
+      <main id="main-content">
         <HeroSection hero={hero} />
         <CategoryTiles />
         <Suspense fallback={<FeaturedProductsSkeleton />}>

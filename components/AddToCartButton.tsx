@@ -10,39 +10,66 @@ type Props = {
   className?: string
 }
 
+type ButtonState = 'idle' | 'loading' | 'added' | 'error'
+
 export default function AddToCartButton({ variantId, availableForSale = true, className }: Props) {
   const { addToCart, isLoading } = useCart()
-  const [added, setAdded] = useState(false)
+  const [state, setState] = useState<ButtonState>('idle')
 
   if (!availableForSale) {
     return (
-      <button disabled className={`flex w-full items-center justify-center gap-2 rounded-md bg-surface border border-white/8 py-3.5 text-sm font-bold text-zinc-500 cursor-not-allowed ${className ?? ''}`}>
+      <button
+        disabled
+        aria-label="Out of stock"
+        className={`flex w-full items-center justify-center gap-2 rounded-md bg-surface border border-white/8 py-3.5 text-sm font-bold text-zinc-500 cursor-not-allowed ${className ?? ''}`}
+      >
         Out of Stock
       </button>
     )
   }
 
   const handleAdd = async () => {
-    await addToCart(variantId)
-    setAdded(true)
-    setTimeout(() => setAdded(false), 2000)
+    if (state !== 'idle' && state !== 'error') return
+    setState('loading')
+
+    const ok = await addToCart(variantId)
+
+    if (ok) {
+      setState('added')
+      setTimeout(() => setState('idle'), 2500)
+    } else {
+      setState('error')
+      setTimeout(() => setState('idle'), 3000)
+    }
   }
 
   return (
     <motion.button
+      type="button"
       onClick={handleAdd}
-      disabled={isLoading}
-      whileTap={{ scale: 0.97 }}
-      className={`relative flex w-full items-center justify-center gap-2 rounded-md bg-accent py-3.5 text-sm font-bold text-white hover:bg-accent-bright transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden ${className ?? ''}`}
+      disabled={isLoading || state === 'loading' || state === 'added'}
+      whileTap={{ scale: state === 'added' ? 1 : 0.97 }}
+      aria-label={
+        state === 'added' ? 'Added to cart' :
+        state === 'error'  ? 'Failed to add — click to retry' :
+        'Add to cart'
+      }
+      className={`relative flex w-full items-center justify-center gap-2 rounded-md py-3.5 text-sm font-bold transition-colors duration-200 disabled:cursor-not-allowed overflow-hidden ${
+        state === 'error'
+          ? 'bg-red-500/20 border border-red-500/30 text-red-400'
+          : state === 'added'
+            ? 'bg-accent/80 text-white'
+            : 'bg-accent hover:bg-accent-bright text-white disabled:opacity-70'
+      } ${className ?? ''}`}
     >
       <AnimatePresence mode="wait" initial={false}>
-        {added ? (
+        {state === 'added' ? (
           <motion.span
             key="added"
-            initial={{ y: 16, opacity: 0 }}
+            initial={{ y: 12, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -16, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            exit={{ y: -12, opacity: 0 }}
+            transition={{ duration: 0.18 }}
             className="flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -50,7 +77,7 @@ export default function AddToCartButton({ variantId, availableForSale = true, cl
             </svg>
             Added to Cart!
           </motion.span>
-        ) : isLoading ? (
+        ) : state === 'loading' ? (
           <motion.span
             key="loading"
             initial={{ opacity: 0 }}
@@ -61,13 +88,27 @@ export default function AddToCartButton({ variantId, availableForSale = true, cl
             <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
             Adding…
           </motion.span>
+        ) : state === 'error' ? (
+          <motion.span
+            key="error"
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -12, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            Failed — Try Again
+          </motion.span>
         ) : (
           <motion.span
             key="idle"
-            initial={{ y: 16, opacity: 0 }}
+            initial={{ y: 12, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -16, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            exit={{ y: -12, opacity: 0 }}
+            transition={{ duration: 0.18 }}
             className="flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

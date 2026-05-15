@@ -1,9 +1,9 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useCart } from '@/context/CartContext'
+import { isSafeCheckoutUrl, logCheckoutDebug } from '@/lib/checkout-utils'
 
 export default function CartDrawer() {
   const { cart, isOpen, isLoading, closeCart, updateQuantity, removeFromCart } = useCart()
@@ -30,6 +30,9 @@ export default function CartDrawer() {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 340, damping: 38 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Shopping cart"
             className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-[420px] flex-col bg-[#141414] border-l border-white/8 shadow-2xl"
           >
             {/* Header */}
@@ -43,6 +46,7 @@ export default function CartDrawer() {
                 )}
               </div>
               <button
+                type="button"
                 onClick={closeCart}
                 className="flex items-center justify-center w-8 h-8 rounded-full text-zinc-400 hover:text-white hover:bg-white/8 transition-colors"
                 aria-label="Close cart"
@@ -71,6 +75,7 @@ export default function CartDrawer() {
                 <p className="text-sm font-semibold text-white">Your cart is empty</p>
                 <p className="text-xs text-zinc-500 text-center">Add some premium car care products to get started.</p>
                 <button
+                  type="button"
                   onClick={closeCart}
                   className="mt-2 rounded-md bg-accent px-6 py-2.5 text-sm font-bold text-white hover:bg-accent-bright transition-colors"
                 >
@@ -105,13 +110,9 @@ export default function CartDrawer() {
 
                       {/* Info */}
                       <div className="flex flex-1 flex-col gap-1 min-w-0">
-                        <Link
-                          href={`/products/${line.productHandle}`}
-                          onClick={closeCart}
-                          className="text-sm font-semibold text-white hover:text-accent transition-colors line-clamp-2 leading-snug"
-                        >
+                        <p className="text-sm font-semibold text-white line-clamp-2 leading-snug">
                           {line.productTitle}
-                        </Link>
+                        </p>
                         {line.variantTitle && (
                           <p className="text-xs text-zinc-500">{line.variantTitle}</p>
                         )}
@@ -119,6 +120,7 @@ export default function CartDrawer() {
                           {/* Qty controls */}
                           <div className="flex items-center gap-0 border border-white/10 rounded-md overflow-hidden">
                             <button
+                              type="button"
                               onClick={() => line.quantity > 1 ? updateQuantity(line.id, line.quantity - 1) : removeFromCart(line.id)}
                               className="flex w-7 h-7 items-center justify-center text-zinc-400 hover:text-white hover:bg-white/8 transition-colors"
                               aria-label="Decrease"
@@ -131,6 +133,7 @@ export default function CartDrawer() {
                               {line.quantity}
                             </span>
                             <button
+                              type="button"
                               onClick={() => updateQuantity(line.id, line.quantity + 1)}
                               className="flex w-7 h-7 items-center justify-center text-zinc-400 hover:text-white hover:bg-white/8 transition-colors"
                               aria-label="Increase"
@@ -144,6 +147,7 @@ export default function CartDrawer() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-white">{line.linePrice}</span>
                             <button
+                              type="button"
                               onClick={() => removeFromCart(line.id)}
                               className="text-zinc-600 hover:text-red-400 transition-colors"
                               aria-label="Remove"
@@ -186,18 +190,27 @@ export default function CartDrawer() {
                     <span className="text-xl font-black text-white">{cart.total}</span>
                   </div>
 
-                  {/* Checkout CTA */}
-                  <a
-                    href={cart.checkoutUrl}
-                    className="flex w-full items-center justify-center gap-2 rounded-md bg-accent py-3.5 text-sm font-bold text-white hover:bg-accent-bright transition-colors duration-200"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                    </svg>
-                    Secure Checkout
-                  </a>
+                  {/* Checkout CTA — validated + debug logged */}
+                  {isSafeCheckoutUrl(cart.checkoutUrl) ? (
+                    <a
+                      href={cart.checkoutUrl}
+                      onClick={() => logCheckoutDebug(cart.checkoutUrl)}
+                      aria-label="Proceed to secure Shopify checkout"
+                      className="flex w-full items-center justify-center gap-2 rounded-md bg-accent py-3.5 text-sm font-bold text-white hover:bg-accent-bright transition-colors duration-200"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                      Secure Checkout
+                    </a>
+                  ) : (
+                    <div className="flex w-full items-center justify-center rounded-md bg-zinc-800 py-3.5 text-sm font-bold text-zinc-500 cursor-not-allowed">
+                      Checkout Unavailable
+                    </div>
+                  )}
 
                   <button
+                    type="button"
                     onClick={closeCart}
                     className="w-full text-center text-xs text-zinc-500 hover:text-white transition-colors py-1"
                   >

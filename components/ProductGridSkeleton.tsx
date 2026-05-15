@@ -4,15 +4,16 @@ export default function ProductGridSkeleton() {
       {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
-          className="flex flex-col rounded-2xl overflow-hidden border border-white/8 bg-[#111111] animate-pulse"
+          className="flex flex-col rounded-xl overflow-hidden border border-white/8 bg-surface animate-pulse"
         >
-          <div className="aspect-square bg-[#1a1a1a]" />
-          <div className="flex items-start justify-between gap-2 px-4 py-4">
-            <div className="flex-1 space-y-2">
-              <div className="h-3.5 bg-white/8 rounded w-4/5" />
-              <div className="h-3.5 bg-white/8 rounded w-3/5" />
+          <div className="aspect-square bg-surface-2" />
+          <div className="px-4 py-4 space-y-2.5">
+            <div className="h-3.5 bg-white/8 rounded w-4/5" />
+            <div className="h-3.5 bg-white/8 rounded w-3/5" />
+            <div className="flex items-center justify-between pt-1">
+              <div className="h-4 bg-white/8 rounded w-14" />
+              <div className="h-7 w-7 rounded-full bg-white/8" />
             </div>
-            <div className="h-4 bg-white/8 rounded w-12 mt-0.5" />
           </div>
         </div>
       ))}

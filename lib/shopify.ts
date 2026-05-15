@@ -65,6 +65,7 @@ export type ShopifyProduct = {
   id: string
   title: string
   handle: string
+  createdAt?: string
   description: string
   descriptionHtml?: string
   vendor?: string
@@ -73,6 +74,7 @@ export type ShopifyProduct = {
   availableForSale?: boolean
   featuredImage: { url: string; altText: string | null } | null
   images?: { edges: { node: { url: string; altText: string | null } }[] }
+  collections?: { edges: { node: { handle: string } }[] }
   priceRange: { minVariantPrice: Money; maxVariantPrice?: Money }
   compareAtPriceRange?: { minVariantPrice: Money }
   variants?: {
@@ -187,6 +189,7 @@ const PRODUCT_FIELDS = gql`
     id
     title
     handle
+    createdAt
     description
     descriptionHtml
     vendor
@@ -195,6 +198,7 @@ const PRODUCT_FIELDS = gql`
     availableForSale
     featuredImage { url altText width height }
     images(first: 8) { edges { node { url altText width height } } }
+    collections(first: 10) { edges { node { handle } } }
     priceRange { minVariantPrice { amount currencyCode } }
     compareAtPriceRange { minVariantPrice { amount currencyCode } }
     variants(first: 100) {
@@ -255,8 +259,9 @@ const COLLECTIONS_QUERY = gql`
 // ─── Featured Products: lightweight product fields for metaobject references ───
 const PRODUCT_REF_FIELDS = gql`
   fragment ProductRefFields on Product {
-    id title handle description availableForSale
+    id title handle createdAt description availableForSale
     featuredImage { url altText }
+    collections(first: 10) { edges { node { handle } } }
     priceRange { minVariantPrice { amount currencyCode } }
     compareAtPriceRange { minVariantPrice { amount currencyCode } }
   }
@@ -415,6 +420,40 @@ export const CART_QUERY = gql`
   ${CART_FIELDS}
 `
 
+// ─── Link sanitiser ───────────────────────────────────────────────────────────
+//
+// Shopify metaobject URL fields may contain full storefront URLs such as
+//   https://velanto-test.myshopify.com/collections/all
+// Passing those directly into Next.js <Link href> navigates outside the
+// headless frontend and hits the Shopify password page.
+// This function always returns a safe internal path.
+
+function sanitizeLink(raw: string, fallback: string): string {
+  const trimmed = raw.trim()
+
+  // Already an internal path — keep as-is
+  if (trimmed.startsWith('/')) return trimmed
+
+  // Relative path without leading slash (e.g. "shop") — add one
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    return trimmed ? `/${trimmed}` : fallback
+  }
+
+  // External URL — try to extract just the pathname so we stay on the
+  // headless frontend instead of jumping to the Shopify storefront.
+  try {
+    const { pathname } = new URL(trimmed)
+    if (pathname && pathname !== '/') return pathname
+  } catch {
+    // malformed URL — fall through to fallback
+  }
+
+  console.warn(
+    `[sanitizeLink] External/invalid link replaced with fallback "${fallback}": ${trimmed}`
+  )
+  return fallback
+}
+
 // ─── Hero transformer ─────────────────────────────────────────────────────────
 
 const HERO_FALLBACK = {
@@ -441,9 +480,9 @@ function transformHeroFields(fields: ShopifyMetaobjectField[]): HomepageHero {
     highlightText: text('highlight_text', HERO_FALLBACK.highlightText),
     subtext: text('subtext', HERO_FALLBACK.subtext),
     primaryButton: text('primary_button', HERO_FALLBACK.primaryButton),
-    primaryLink: text('primary_link', HERO_FALLBACK.primaryLink),
+    primaryLink: sanitizeLink(text('primary_link', HERO_FALLBACK.primaryLink), HERO_FALLBACK.primaryLink),
     secondaryButton: text('secondary_button', HERO_FALLBACK.secondaryButton),
-    secondaryLink: text('secondary_link', HERO_FALLBACK.secondaryLink),
+    secondaryLink: sanitizeLink(text('secondary_link', HERO_FALLBACK.secondaryLink), HERO_FALLBACK.secondaryLink),
     heroImage: image('hero_image'),
     backgroundImage: image('background_image'),
   }
@@ -523,6 +562,85 @@ export async function getCollections(first = 12): Promise<ShopifyCollection[]> {
     } else {
       console.error('[getCollections]', err instanceof Error ? err.message : err)
     }
+    return []
+  }
+}
+
+// ─── Navigation collections ───────────────────────────────────────────────────
+
+/** Handles that should never appear in navigation */
+const NAV_EXCLUDED_HANDLES = new Set([
+  'frontpage', 'home', 'homepage', 'home-page', 'automated-collection', 'all',
+])
+
+/**
+ * Preferred display order for well-known collections.
+ * Collections not listed here appear after these, sorted alphabetically.
+ */
+const NAV_COLLECTION_ORDER = [
+  'exterior-care',
+  'interior-care',
+  'kits-bundles',
+  'wheel-tyre',
+  'ceramic-protection',
+]
+
+/**
+ * Short display labels for known collection handles.
+ * Falls back to the Shopify collection title if handle not listed.
+ */
+const NAV_COLLECTION_LABELS: Record<string, string> = {
+  'exterior-care':      'Exterior',
+  'interior-care':      'Interior',
+  'kits-bundles':       'Kits & Bundles',
+  'wheel-tyre':         'Wheel & Tyre',
+  'ceramic-protection': 'Ceramic',
+}
+
+export type NavCollectionItem = {
+  label: string
+  handle: string
+  href: string
+}
+
+/**
+ * Fetches Shopify collections and returns them as safe navigation items.
+ *
+ * - Filters out non-product collections (frontpage, etc.)
+ * - Applies a curated sort order for known collections
+ * - Unknown collections appear after the curated set, alphabetically
+ * - Maps handles to short display labels where defined
+ * - Never throws — returns [] on any API failure so the header still renders
+ */
+export async function getNavigationCollections(): Promise<NavCollectionItem[]> {
+  'use cache'
+  cacheLife('hours')
+  cacheTag('nav-collections')
+
+  try {
+    const raw = await getCollections(30)
+
+    const filtered = raw.filter(
+      (c) => c.handle && !NAV_EXCLUDED_HANDLES.has(c.handle.toLowerCase())
+    )
+
+    // Sort: curated-order items first, then remaining alphabetically by title
+    const ordered = [
+      ...NAV_COLLECTION_ORDER
+        .map((handle) => filtered.find((c) => c.handle === handle))
+        .filter((c): c is ShopifyCollection => c !== undefined),
+      ...filtered
+        .filter((c) => !NAV_COLLECTION_ORDER.includes(c.handle))
+        .sort((a, b) => a.title.localeCompare(b.title)),
+    ]
+
+    return ordered.map((c) => ({
+      label: NAV_COLLECTION_LABELS[c.handle] ?? c.title,
+      handle: c.handle,
+      href: `/collections/${c.handle}`,
+    }))
+  } catch (err) {
+    console.warn('[getNavigationCollections] failed, hiding dynamic nav items:', err instanceof Error ? err.message : err)
     return []
   }
 }

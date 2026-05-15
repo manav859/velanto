@@ -55,7 +55,7 @@ export default async function GuideDetailPage({ params }: Props) {
     <>
       <AnnouncementBar />
       <Header />
-      <main>
+      <main id="main-content">
 
         {/* ── Hero / cover image ───────────────────────────────────────────── */}
         <div className="relative bg-background">
@@ -77,7 +77,7 @@ export default async function GuideDetailPage({ params }: Props) {
             className={`mx-auto max-w-3xl px-4 sm:px-6 ${article.image ? '-mt-24 relative z-10' : 'pt-16'} pb-8`}
           >
             {/* Breadcrumb */}
-            <nav className="flex items-center gap-2 text-xs text-zinc-500 mb-6">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-zinc-500 mb-6">
               <Link href="/" className="hover:text-white transition-colors">Home</Link>
               <span>/</span>
               <Link href="/guides" className="hover:text-white transition-colors">Guides</Link>

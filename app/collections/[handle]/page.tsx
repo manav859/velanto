@@ -33,7 +33,7 @@ export default async function CollectionPage({ params }: Props) {
     <>
       <AnnouncementBar />
       <Header />
-      <main>
+      <main id="main-content">
         {/* Hero */}
         <div className="relative bg-background border-b border-white/8 overflow-hidden">
           {collection.image && (
@@ -49,13 +49,13 @@ export default async function CollectionPage({ params }: Props) {
             </div>
           )}
           <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
-            <div className="flex items-center gap-2 text-xs text-zinc-500 mb-4">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-zinc-500 mb-4">
               <Link href="/" className="hover:text-white transition-colors">Home</Link>
               <span>/</span>
               <Link href="/shop" className="hover:text-white transition-colors">Shop</Link>
               <span>/</span>
               <span className="text-white">{collection.title}</span>
-            </div>
+            </nav>
             <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-2">{collection.title}</h1>
             {collection.description && (
               <p className="text-zinc-400 text-base max-w-xl">{collection.description}</p>
@@ -67,9 +67,12 @@ export default async function CollectionPage({ params }: Props) {
         {/* Products */}
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
           {collection.products.length === 0 ? (
-            <div className="py-24 text-center">
-              <p className="text-zinc-400 text-lg font-semibold mb-2">No products in this collection</p>
-              <Link href="/shop" className="text-accent text-sm font-medium hover:underline">Browse all products</Link>
+            <div className="rounded-2xl border border-white/8 bg-surface py-20 text-center">
+              <p className="text-zinc-200 text-lg font-semibold mb-2">No products in this collection yet</p>
+              <p className="mx-auto mb-5 max-w-md text-sm text-zinc-500">
+                Publish products to this Shopify collection and they will appear here automatically.
+              </p>
+              <Link href="/shop" className="inline-flex rounded-full border border-white/15 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/5">Browse all products</Link>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
