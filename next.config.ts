@@ -14,10 +14,9 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      // Product detail pages are disabled — every /products/* request routes to /shop.
-      // 308 permanent redirect preserves SEO equity for any bookmarked or indexed URLs.
+      // Legacy Shopify storefront URLs → headless equivalents
+      { source: '/products/:handle*', destination: '/shop/:handle*', permanent: true },
       { source: '/products', destination: '/shop', permanent: true },
-      { source: '/products/:handle*', destination: '/shop', permanent: true },
     ]
   },
 }

@@ -20,7 +20,7 @@ export default function ProductCard({ product, index = 0 }: Props) {
       viewport={{ once: true, margin: '-40px' }}
       transition={{ duration: 0.45, delay: (index % 4) * 0.07, ease: [0.22, 1, 0.36, 1] }}
     >
-      <Link href="/shop" className="group block" aria-label={`View ${title} in shop`}>
+      <Link href={`/shop/${product.handle}`} className="group block" aria-label={`View ${title}`}>
         <article className="flex h-full flex-col overflow-hidden rounded-xl border border-white/8 bg-surface transition-all duration-300 group-hover:-translate-y-1 group-hover:border-accent/30 group-hover:shadow-lg group-hover:shadow-accent/5">
           <div className="relative aspect-square overflow-hidden bg-surface-2">
             {onSale && (
